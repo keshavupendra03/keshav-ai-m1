@@ -136,6 +136,17 @@ class KeshavAIBot:
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
+                # Container-safety / memory flags - Docker's default
+                # /dev/shm is tiny (64MB) and will crash Chromium
+                # without this; the rest trim background work that
+                # otherwise adds to RSS on a memory-constrained host.
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
             ]
         )
 
