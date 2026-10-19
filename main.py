@@ -2,20 +2,24 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from pool import KeshavAIPool
+import os
 import uvicorn
 
-# Number of parallel browser workers. Each worker is a full headless
-# Chromium page, so this trades RAM/CPU for lower wait time under
-# concurrent load. Tune based on expected simultaneous users and
-# available server resources.
+# Number of parallel browser workers. Each worker is a full Chromium
+# instance loading the heavy chatgpt.com app, so this is almost
+# entirely a RAM question, not a CPU one. Render's smallest instance
+# gives 512Mi total - a single loaded Chromium tab alone can use a
+# few hundred MB, so POOL_SIZE=3 reliably OOM-kills the container
+# before it ever finishes starting (confirmed in deploy logs).
 #
-# HEADLESS = False opens a real, visible Chromium window per worker
-# so you can watch the automation happen live. Keep POOL_SIZE at 1
-# while doing this - otherwise N windows pop up at once and it's
-# hard to follow any single one. Set both back (4 / True) for normal
-# headless/concurrent use once you're done observing.
-POOL_SIZE = 3
-HEADLESS = True
+# Read from the environment so this can be tuned per-deployment
+# without a code change: set POOL_SIZE/HEADLESS in Render's
+# environment variables. Defaults here are deliberately conservative
+# (safe for a memory-constrained host); bump POOL_SIZE up locally via
+# `set POOL_SIZE=3` (PowerShell: `$env:POOL_SIZE=3`) if you want
+# concurrent workers on a machine with enough RAM to spare.
+POOL_SIZE = int(os.environ.get("POOL_SIZE", "1"))
+HEADLESS = os.environ.get("HEADLESS", "true").lower() != "false"
 
 pool = KeshavAIPool(size=POOL_SIZE, headless=HEADLESS)
 
@@ -86,4 +90,5 @@ async def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
